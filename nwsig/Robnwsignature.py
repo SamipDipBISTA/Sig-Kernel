@@ -297,21 +297,24 @@ class NadarayaWatsonSignature(BaseEstimator):
     #######---PATCH--EFM SIGNATURES---########
     ##########################################
         if self.efm_signature:
-            if not self.lam:
+            if  len(self.lam)==0:
                 raise ValueError("Lambda parameter 'lam' must be provided for EFM signatures.")
             
             for i in range(paths.shape[0]):
+                print(f"Computing EFM signature for path {i+1}/{paths.shape[0]}...")
                 sig = path_to_fm_signature(paths[i], trunc=sig_level, t_grid=jnp.arange(paths.shape[1]), lam=self.lam)
-                signatures.append(sig[-1])
+                signatures.append(sig[:,-1])
     ##########################################
         elif self.log_signature:
             logsig_spec = ii.prepare(paths.shape[-1], sig_level)
             for i in range(paths.shape[0]):
+                print(f"Computing log-signature for path {i+1}/{paths.shape[0]}...")
                 sig = ii.logsig(paths[i], logsig_spec)
                 signatures.append(sig)
             
         else:
             for i in range(paths.shape[0]):
+                print(f"Computing normal signature for path {i+1}/{paths.shape[0]}...")
                 sig = ii.sig(paths[i], sig_level, self.signature_mode)
                 
                 # Take final signature if matrix output

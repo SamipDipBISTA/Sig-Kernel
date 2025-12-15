@@ -7,49 +7,48 @@ import matplotlib.pyplot as plt
 
 import signature.tensor_algebra as ta
 from simulation.diffusion import Diffusion
+from arch import arch_model
 
 import matplotlib
 # %%
-T = 10
+np.random.seed(0)
+ret = np.random.randn(1000)
 
-t_grid = jnp.linspace(-T, T, (T * 2) * 365 + 1)
-rng = np.random.default_rng(seed=4843)
-size = 10
+am = arch_model(ret, vol="Garch", p=1, q=1)
+res = am.fit(disp="off")
 
-diffusion = Diffusion(t_grid=t_grid - t_grid[0], size=size, rng=rng)
-W = diffusion.brownian_motion()[0, 0, :]
+n_sims = 1000
+n_obs = 1
+simulations = np.zeros((n_sims, n_obs))
 
-fig, ax = plt.subplots()
+for i in range(n_sims):
+    sim = am.simulate(res.params, nobs=n_obs)
+    simulations[i, :] = sim['data']
 
-shift = 365
-ax.plot(t_grid, W, label="BM")
-ax.plot(t_grid[:-shift], W[shift:], label="Shifted BM")
-ax.vlines(0, -3, 2, "k", ls='--')
-ax.legend()
-ax.set_title("Driving Brownian motion W")
+W = simulations
+t_grid = np.linspace(0, 1, n_sims)
 
-fig.tight_layout()
-
+plt.plot(t_grid, W)
 # %%
-W = np.sin(t_grid)
-plt.plot(W)
-#%%
-t_grid_pos = t_grid[t_grid >= 0]
-W_pos = W[t_grid >= 0]
-W_pos.shape
-#%%
-path = np.vstack([t_grid, W]).T
-path_pos = np.vstack([t_grid_pos, W_pos]).T
-dim = path.shape[1]
-
+print(W.shape, t_grid.shape)
+path = np.column_stack([t_grid, W])
 print(path.shape)
+
 #%%
 
 N = 3
-Sig = ta.path_to_signature(path=path_pos, trunc=N)
+Sig = ta.path_to_signature(path=path, trunc=N)
+print(Sig[:,-1])
+#%%
 
 lam = jnp.array([10])
 SigS = ta.path_to_fm_signature(path=path, trunc=N, t_grid=t_grid, lam=lam)
+
+#%%
+print('Sig', Sig[:,-1])
+print('EFM Sig', SigS[:,-1])
+plt.scatter(Sig[:,-1], SigS[:,-1])
+
 # %%
 num_iterations = Sig.shape[0]  # number of iterations
 
