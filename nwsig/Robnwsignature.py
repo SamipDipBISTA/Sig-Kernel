@@ -84,6 +84,7 @@ class NadarayaWatsonSignature(BaseEstimator):
         initial_condition: bool = True,
         metric_choice: str = 'signature_metric',
         p_param: Optional[float] = 2,
+        t_grid: Optional[np.ndarray] = None,
         lam: Optional[np.ndarray] = None,
     ):
         self.signature_level = signature_level
@@ -106,6 +107,7 @@ class NadarayaWatsonSignature(BaseEstimator):
         self.metric_choice = metric_choice
         self.p_param = p_param
         self.efm_signature = efm_signature #EFM signature
+        self.t_grid = t_grid
         self.lam = lam
         
         # Set device
@@ -302,7 +304,7 @@ class NadarayaWatsonSignature(BaseEstimator):
             
             for i in range(paths.shape[0]):
                 print(f"Computing EFM signature for path {i+1}/{paths.shape[0]}...")
-                sig = path_to_fm_signature(paths[i], trunc=sig_level, t_grid=jnp.arange(paths.shape[1]), lam=self.lam)
+                sig = path_to_fm_signature(paths[i], trunc=sig_level, t_grid=self.t_grid, lam=self.lam)
                 signatures.append(sig[:,-1])
     ##########################################
         elif self.log_signature:

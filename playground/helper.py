@@ -1,44 +1,56 @@
 
+
+from arch import arch_model
+import matplotlib.pyplot as plt
+import numpy as np
+from aeon.datasets import load_regression
+from aeon.regression.distance_based import KNeighborsTimeSeriesRegressor
+from aeon.transformations.collection.signature_based import SignatureTransformer
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
+from sklearn.utils import shuffle
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import Ridge
+
+
 import time
+
 import numpy as np
 import jax.numpy as jnp
 from typing import List, Tuple, Optional
-from signature.path_signature import path_to_fm_signature
+from signature.path_signature import path_to_fm_signature, path_to_signature
+
+
+def simulate_garch(n_obs=100, n_sims=1, p=1, q=1, type = "Garch", seed=0):
+    np.random.seed(seed)
+    ret = np.random.randn(1000)
+    am = arch_model(ret, vol=type, p=1, q=1)
+    res = am.fit(disp="off")
+    t_grid = jnp.linspace(0, 1, n_obs).reshape(1, -1)
+    simulations = np.zeros((n_sims, n_obs))
+    for i in range(n_sims):
+        sim = am.simulate(res.params, nobs=n_obs)
+        simulations[i, :] = sim['data']
+    return res.params, t_grid, simulations
+
+
+
+
+#compute signatures
+
 def compute_efm_signatures(
     n_obs: int,
     t_grid: np.ndarray,
     simulations: np.ndarray,
+    signature_type: str ='EFM',
+    start_idx: int = 1,
     lam: Optional[jnp.ndarray] = None,
     trunc: int = 3,
     verbose: bool = True,
 ):
     """
     Compute EFM signatures for a single path across time steps and
-    collect the corresponding target values.
-    
-    Parameters
-    ----------
-    n_obs : int
-        Number of observations/time steps to process. The loop will run for t = 1..(n_obs-1).
-    t_grid : np.ndarray
-        Time grid of shape (N_paths, N_times) or (1, N_times).
-        This function uses the first path row: t_grid[0, :t].
-    simulations : np.ndarray
-        Simulated paths of shape (N_paths, N_times). This function uses simulations[0, :t].
-    lam : Optional[jnp.ndarray], default=None
-        Damping parameter for the signature function. Defaults to jnp.array([0.1]) if None.
-    trunc : int, default=3
-        Truncation level passed to `path_to_fm_signature`.
-    verbose : bool, default=True
-        If True, prints the processed time step index.
-    Returns
-    -------
-    y : List[float]
-        List of target values y_t = simulations[0, t] for t = 1..(n_obs-1).
-    efm_signatures : List[np.ndarray]
-        List of signature vectors at each time step (last column of SigS).
-    elapsed : float
-        Elapsed wall-clock time (in seconds) for the full computation.
     """
     # Default lam if not provided
     if lam is None:
@@ -59,7 +71,7 @@ def compute_efm_signatures(
     efm_signatures: List[np.ndarray] = []
 
     start = time.perf_counter()
-    for t in range(1, n_obs):
+    for t in range(start_idx, n_obs):
         if verbose:
             print("Processing time step:", t)
 
@@ -68,7 +80,10 @@ def compute_efm_signatures(
         path = np.vstack([t_grid_t, sim_path]).T  # shape: (t, 2)
 
         # Call the provided signature function
-        SigS = path_to_fm_signature(path=path, trunc=trunc, t_grid=t_grid_t, lam=lam)
+        if signature_type == 'EFM':
+            SigS = path_to_fm_signature(path=path, trunc=trunc, t_grid=t_grid_t, lam=lam)
+        else:
+            SigS = path_to_signature(path=path, trunc=trunc)
 
         # Collect the last signature column (vector at current step)
         efm_signatures.append(SigS[:, -1])
@@ -80,3 +95,54 @@ def compute_efm_signatures(
     elapsed = end - start
     print(f"Time taken to compute EFM signatures: {(elapsed)/60:.2f} minutes")
     return y, efm_signatures
+
+
+def compute_sliding_window_signatures(
+    simulations: np.ndarray,
+    t_grid: np.ndarray,
+    trunc: int = 3,
+    window: int = 5,
+    verbose: bool = True,
+):
+    if t_grid.ndim != 2 or simulations.ndim != 2:
+        raise ValueError("t_grid and simulations must be 2D arrays")
+
+    n_obs = simulations.shape[1]
+    y = []
+    signatures = []
+    t_grid_t = t_grid[0, 0:window]
+    sim_path = simulations[0, 0:window]
+    path = np.vstack([t_grid_t, sim_path]).T
+
+    Sig = path_to_signature(path=path, trunc=trunc)
+    for t in range(window, n_obs):
+        if verbose:
+            print("Processing time step:", t)
+
+        t_grid_t = t_grid[0, t - window:t]
+        sim_path = simulations[0, t - window:t]
+        path = np.vstack([t_grid_t, sim_path]).T
+
+        Sig = path_to_signature(path=path, trunc=trunc)
+        signatures.append(Sig[:, -1])
+        y.append(simulations[0, t])
+
+    return y, signatures
+
+
+
+# Ridge
+
+
+def ridge_regression(X, y, test_size=0.2, alpha=1.0):
+    X = np.array(X)
+    y = np.array(y)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, shuffle=False)
+    model = Ridge(alpha=alpha)
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    mse = mean_squared_error(y_test, y_pred)
+    rmse = np.sqrt(mse)
+    mae = mean_absolute_error(y_test, y_pred)
+    r2 = r2_score(y_test, y_pred)
+    return model, y_pred, mse, rmse, mae, r2
