@@ -66,3 +66,4 @@ def sig_sliding(
         sig_matrix = np.delete(sig_matrix, indices, axis=1)
      
     return sig_matrix
+

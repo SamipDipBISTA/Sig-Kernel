@@ -20,6 +20,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import Ridge
 
 import time
+import torch
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -28,6 +29,11 @@ warnings.filterwarnings('ignore')
 import helper
 import importlib
 importlib.reload(helper)
+
+import run_NW_reg
+import importlib
+importlib.reload(run_NW_reg)
+
 from nwsig import NWSignatureRegressor, augment_with_time
 from helper import *
 from run_NW_reg import *
@@ -42,17 +48,16 @@ import jax.numpy as jnp
 
 window = 5
 
-# %%
 
 #Simulate Garch(1,1) data
-n_obs = 100
+n_obs = 1000
 garch_params, t_grid, simulations = simulate_garch(n_obs=n_obs, n_sims=1, seed=None)
 print('garch_params:', garch_params)
 print('t_grid shape:', t_grid.shape)
 print('simulations shape:', simulations.shape)
-'''
-#%%
 
+#%%
+'''
 #BM
 n_obs, n_sims, T, seed = 100, 1, 1.0, None
 np.random.seed(seed)
@@ -66,13 +71,16 @@ print('t_grid shape:', t_grid.shape)
 print('simulations shape:', simulations.shape)
 print('simulation sample:', simulations[0, :5])
 '''
+
 #%%
 #EFM signatures
-lam = jnp.array([100])
+lam = jnp.array([0.1])
 
 y, efm_signatures = compute_efm_signatures(n_obs=n_obs, t_grid=t_grid, simulations=simulations, start_idx = window, lam=lam, trunc=3, verbose=True)
-print(f"EFM signatures shape: {np.array(efm_signatures).shape}")
+
+print(f"EFM signatures shape: {efm_signatures.shape}")
 print(f"y shape: {np.array(y).shape}")
+
 #%%
 y, signatures = compute_sliding_window_signatures(simulations=simulations, t_grid=t_grid, window=window, verbose=True)#no expanding with vanilla signatures
 print(f"Vanilla signatures shape: {np.array(signatures).shape}")
@@ -81,14 +89,15 @@ print(f"y shape: {np.array(y).shape}")
 
 #%%
 #Prepare training and test data
-X_efm = np.array(efm_signatures)
+X_efm = efm_signatures
 y_efm = np.array(y)
 
-X = np.array(signatures)
+X = signatures
 y = np.array(y)
 
 y_series = pd.Series(y)
 y_series.describe()
+
 #%%
 #NW
 nw_regressor_efm, y_pred_nw_efm, mse_nw_efm, rmse_nw_efm, mae_nw_efm, r2_nw_efm = local_reg_nw_signature(X_efm, y_efm)
@@ -99,6 +108,7 @@ print(f"  RMSE: {rmse_nw_efm:.4f}")
 print(f"  MAE:  {mae_nw_efm:.4f}")
 print(f"  R²:   {r2_nw_efm:.4f}")
 
+#%%
 #Ridge regression
 
 ridge_model_efm, y_pred_ridge_efm, mse_ridge_efm, rmse_ridge_efm, mae_ridge_efm, r2_ridge_efm = ridge_regression(X_efm, y_efm, test_size=0.2, alpha=0.01)

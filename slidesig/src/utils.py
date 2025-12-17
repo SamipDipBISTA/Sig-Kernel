@@ -35,7 +35,7 @@ def exponential_smoothing(series, smooth_param):
 
 def setup_latex_plotting():
     """Configure Matplotlib for LaTeX rendering and set font parameters."""
-    plt.rcParams['text.usetex'] = True
+    plt.rcParams['text.usetex'] = False
     plt.rcParams['font.family'] = 'serif'
     plt.rcParams['font.serif'] = 'Computer Modern'
     plt.rcParams['text.latex.preamble'] = r'\usepackage{amsmath}'

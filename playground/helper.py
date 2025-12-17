@@ -12,7 +12,7 @@ from sklearn.utils import shuffle
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import Ridge
-
+from scipy.optimize import minimize
 
 import time
 
@@ -47,7 +47,7 @@ def compute_efm_signatures(
     start_idx: int = 1,
     lam: Optional[jnp.ndarray] = None,
     trunc: int = 3,
-    verbose: bool = True,
+    verbose: bool = True
 ):
     """
     Compute EFM signatures for a single path across time steps and
@@ -64,37 +64,28 @@ def compute_efm_signatures(
     if simulations.shape[1] != n_times:
         raise ValueError("t_grid and simulations must have the same number of time columns.")
 
-    if n_obs > n_times:
-        raise ValueError(f"n_obs ({n_obs}) cannot exceed the number of columns in t_grid ({n_times}).")
 
-    y: List[float] = []
-    efm_signatures: List[np.ndarray] = []
+    y = []
+
+    t_grid_shifted = t_grid - t_grid[0][start_idx]        
+    sim_path = simulations 
+    path = np.vstack([t_grid_shifted, sim_path]).T 
+    
 
     start = time.perf_counter()
     for t in range(start_idx, n_obs):
-        if verbose:
-            print("Processing time step:", t)
+         y.append(simulations[0, t])
 
-        t_grid_t = t_grid[0, :t]          # shape: (t,)
-        sim_path = simulations[0, :t]     # shape: (t,)
-        path = np.vstack([t_grid_t, sim_path]).T  # shape: (t, 2)
+    print('t_grid:', t_grid_shifted.shape)
+    print('Path shape:', path.shape)
+    print('y size:', len(y))
 
-        # Call the provided signature function
-        if signature_type == 'EFM':
-            SigS = path_to_fm_signature(path=path, trunc=trunc, t_grid=t_grid_t, lam=lam)
-        else:
-            SigS = path_to_signature(path=path, trunc=trunc)
-
-        # Collect the last signature column (vector at current step)
-        efm_signatures.append(SigS[:, -1])
-
-        # Collect the target value at time t for the first path
-        y.append(simulations[0, t])
-
+    SigS = path_to_fm_signature(path=path, trunc=trunc, t_grid=t_grid_shifted.flatten(), lam=lam)
     end = time.perf_counter()
     elapsed = end - start
-    print(f"Time taken to compute EFM signatures: {(elapsed)/60:.2f} minutes")
-    return y, efm_signatures
+    print(f"Time taken to compute EFM signatures: {elapsed:.2f} seconds")
+    
+    return y, np.array(SigS.array.T)
 
 
 def compute_sliding_window_signatures(
@@ -146,3 +137,16 @@ def ridge_regression(X, y, test_size=0.2, alpha=1.0):
     mae = mean_absolute_error(y_test, y_pred)
     r2 = r2_score(y_test, y_pred)
     return model, y_pred, mse, rmse, mae, r2
+
+
+
+def optimize_params(path, y, trunc, time_grid, model):
+    dim = path.shape[1]
+
+    def loss(x):
+        StatSig = ta.path_to_fm_signature(path=path, trunc=trunc, t_grid=time_grid, lam=x)
+        model.fit(StatSig.array.T, y)
+        return mean_squared_error(y, model.predict(StatSig.array.T))
+
+    optimizer = minimize(loss, x0=np.ones(dim) * 4, bounds=([0.00001, 50],) * dim,  method='Powell')
+    return optimizer.x

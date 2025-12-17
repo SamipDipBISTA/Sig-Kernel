@@ -5,10 +5,14 @@ baselines.py — Baseline linear regression models for synthetic and real data.
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error, root_mean_squared_error
+from sklearn.metrics import mean_absolute_error, mean_absolute_percentage_error, mean_squared_error#, root_mean_squared_error
 
 from src.utils import exponential_smoothing
 
+
+
+def root_mean_squared_error(y_true, y_pred):
+    return np.sqrt(mean_squared_error(y_true, y_pred))
 
 
 # Fit, predict, evaluate
