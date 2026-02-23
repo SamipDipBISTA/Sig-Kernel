@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from sklearn.base import BaseEstimator, RegressorMixin, ClassifierMixin
 from sklearn.model_selection import KFold, StratifiedKFold
 from sklearn.metrics import mean_squared_error, accuracy_score
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 import iisignature as ii
 import warnings
 import scipy as sc
@@ -86,6 +86,7 @@ class NadarayaWatsonSignature(BaseEstimator):
         p_param: Optional[float] = 2,
         t_grid: Optional[np.ndarray] = None,
         lam: Optional[np.ndarray] = None,
+        standard_scale: bool = True,
     ):
         self.signature_level = signature_level
         self.bandwidth = bandwidth
@@ -109,6 +110,7 @@ class NadarayaWatsonSignature(BaseEstimator):
         self.efm_signature = efm_signature #EFM signature
         self.t_grid = t_grid
         self.lam = lam
+        self.standard_scale = standard_scale
         
         # Set device
         if self.use_gpu is None:
@@ -302,10 +304,11 @@ class NadarayaWatsonSignature(BaseEstimator):
             if  len(self.lam)==0:
                 raise ValueError("Lambda parameter 'lam' must be provided for EFM signatures.")
             
-            for i in range(paths.shape[0]):
-                print(f"Computing EFM signature for path {i+1}/{paths.shape[0]}...")
-                sig = path_to_fm_signature(paths[i], trunc=sig_level, t_grid=self.t_grid, lam=self.lam)
-                signatures.append(sig[:,-1])
+            print(f"Computing EFM signature for path {i+1}/{paths.shape[0]}...")
+            sig = path_to_fm_signature(paths[i], trunc=sig_level, t_grid=self.t_grid, lam=self.lam).arrays.T
+            if self.standard_scale:
+                sig = StandardScaler.fit_transform(sig)
+            signatures =  sig
     ##########################################
         elif self.log_signature:
             logsig_spec = ii.prepare(paths.shape[-1], sig_level)
@@ -324,7 +327,8 @@ class NadarayaWatsonSignature(BaseEstimator):
                     sig = sig[-1, :]
                 
                 signatures.append(sig)
-        
+        if self.standard_scale:
+            signatures = StandardScaler.fit_transform(np.array(signatures))
         return np.array(signatures)
     
 
@@ -560,7 +564,7 @@ class NadarayaWatsonSignature(BaseEstimator):
                 try:
                     X_sig = self._compute_signatures(X, sig_level)
                     print(f"Computed signatures shape: {X_sig.shape}")
-                    
+          
                     # Check signature quality
                     if np.all(X_sig == 0):
                         print(f"WARNING: All signatures are zero for level {sig_level}, skipping...")

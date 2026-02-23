@@ -4,12 +4,15 @@ ridge_signatures.py — Function for fitting the ridge regression model on slidi
 
 import numpy as np
 from sklearn.linear_model import Ridge
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
 from sklearn.metrics import (
     #root_mean_squared_error,
     mean_squared_error,
     mean_absolute_percentage_error,
     mean_absolute_error,
 )
+
 from src.signatures import sig_sliding
 import sys, os
 sys.path.append(os.path.abspath(os.path.join("..", "..")))
@@ -41,7 +44,8 @@ def ridge_signatures(
     signature_type = 'sw',
     lam = None,
     T = 1,
-    max_window = 32*48 # max window set
+    max_window = 32*48, # max window set,
+    scale = False,
 ):
     """
     Ridge regression on truncated signatures with optional ridge regularization parameter (penalty) tuning.
@@ -108,16 +112,13 @@ def ridge_signatures(
             #print("val end:", val_end)
             print('-----------------------------------------')
             print("total train+val+test:", X_train.shape[0]+X_val.shape[0]+X_test.shape[0])
-            print('total data:', len(covariates)-max_window)
-                    
-
+            print('total data:', len(covariates)-max_window)                
         else:
             train_start = max_window
             train_end = n_train 
 
             X_train = signatures[train_start:train_end, :]
             y_train = target[train_start:train_end] - target[train_start-delay:train_end-delay]
-
             X_val, y_val = None, None
             X_test = signatures[train_end:, :]
 
@@ -179,8 +180,7 @@ def ridge_signatures(
     elif signature_type == 'efm': #EFM signatures
         if len(lam)==0:
             raise ValueError('efm signatures need lambda')
-        _, signatures = compute_efm_signatures(n_obs=n_obs, t_grid=t_grid, simulations=covariates.reshape(1,-1), start_idx=max_window, lam=lam) # function imported from helper.py
-
+        _, signatures = compute_efm_signatures(n_obs=n_obs, t_grid=t_grid, simulations=covariates.reshape(1,-1), trunc = trunc_order, start_idx=max_window, lam=lam) # function imported from helper.py
         print('EFM signatures shape:', signatures.shape)
 
         # Train-validation-test split
@@ -215,9 +215,8 @@ def ridge_signatures(
         else:
             train_start = 0
             train_end = n_train - max_window
-
             X_train = signatures[train_start:train_end, :]
-            y_train = target[train_start+max_window:train_end] - target[train_start-delay+max_window:train_end-delay]
+            y_train = target[train_start+max_window:train_end+max_window] - target[train_start-delay+max_window:train_end-delay+max_window]
 
             X_val, y_val = None, None
             X_test = signatures[train_end:, :]
@@ -227,13 +226,20 @@ def ridge_signatures(
         if tune_penalty:
             best_score = np.inf
             for penalty in penalties:
-                model = Ridge(alpha=penalty)
+                if scale:
+                    model = Pipeline([
+                        ("scaler", StandardScaler()),
+                        ("regressor", Ridge(fit_intercept=True, alpha=penalty))
+                    ])
+                else:
+                    model = Ridge(alpha=penalty)
                 model.fit(X_train, y_train)
                 y_val_pred_diff = model.predict(X_val)
                 y_val_pred = y_val_pred_diff + target[train_end-delay:val_end-delay]
                 y_val_true = target[train_end:val_end]
 
                 score = METRICS[metric](y_val_true, y_val_pred)
+                print(score, best_score, penalty, best_penalty)
                 if score < best_score:
                     best_score = score
                     best_penalty = penalty
@@ -245,8 +251,13 @@ def ridge_signatures(
         else:
             X_train_full = X_train
             y_train_full = y_train
-
-        model_best = Ridge(alpha=best_penalty)
+        if scale:
+            model_best = Pipeline([
+                ("scaler", StandardScaler()),
+                ("regressor", Ridge(fit_intercept=True, alpha=best_penalty))
+            ])
+        else:
+            model_best = Ridge(alpha=best_penalty)
         model_best.fit(X_train_full, y_train_full)
 
         # Predictions
@@ -271,8 +282,9 @@ def ridge_signatures(
         # Calculate the error metric
         error_train = METRICS[metric](y_true_train, y_pred_train)
         error_test  = METRICS[metric](y_true_test, y_pred_test)
-
-  
+    
+        if scale:
+            model_best = model_best["regressor"]
 
     return {
         "y_pred_train": y_pred_train,
@@ -281,4 +293,5 @@ def ridge_signatures(
         "error_train": error_train,
         "error_test": error_test,
         "best_penalty": best_penalty,
+        "model": model_best
     }
