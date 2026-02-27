@@ -50,18 +50,19 @@ S = np.hstack([S2,S3]) #, S3, S4])
 
 
 #%%
-plt.plot(time2[:1000], S[0,:1000])
-plt.plot(time2[1000:], S[0,1000:])
+plt.plot(time2[:T], S[0,:T])
+plt.plot(time2[T:], S[0,T:])
 plt.show()
 
 #%%
 #OU + Expected Signature
 lam = 1
 level = 3
+exp_window = 10
 split_for_umap = 500
-path = np.vstack([time2, S.ravel()]).T
-
 efm = False
+
+path = np.vstack([time2, S.ravel()]).T
 
 timestamp = []
 exp_sig_arr = []
@@ -77,10 +78,74 @@ for k in tqdm(range(N_wind)):
 exp_sig_arr = np.array(exp_sig_arr)
 timestamp = np.array(timestamp)/1000
 
+######################################################################################################
+######################################################################################################
+######################################################################################################
+######################################################################################################
+'''
+cumsum = exp_sig_prev =  path_to_signature(path, trunc=level).array.T[0] * 0
+
+for k in tqdm(range(N_wind)):
+    
+    #timestamp.append((k+1)*T2//(N_wind))
+    if not efm:
+        cumsum += path_to_signature(path[k * (T2 // N_wind):(k + 1) * (T2 // N_wind)+1], trunc=level).array.T[-1] 
+    else:
+        cumsum += path_to_fm_signature(path[k * (T2 // N_wind):(k + 1) * (T2 // N_wind)+1], trunc=level,t_grid=time2[k * (T2 // N_wind):(k + 1) * (T2 // N_wind)],lam=lam).array.T[-1] 
+    if wdw == exp_window:
+        timestamp.append((k+1)*T2//(N_wind))
+        exp_sig = cumsum - exp_sig_prev
+        exp_sig_arr.append(exp_sig/exp_window)
+        exp_sig_prev = cumsum
+        wdw = 1
+    wdw +=1
+    
+exp_sig_arr = np.array(exp_sig_arr)
+timestamp = np.array(timestamp)/1000
+'''
+######################################################################################################
+######################################################################################################
+######################################################################################################
+######################################################################################################
+
+'''
+step_sigs = []
+for k in tqdm(range(N_wind)):
+    start = k * (T2 // N_wind)
+    end = (k + 1) * (T2 // N_wind) + 1 # 
+    
+    seg = path[start:end]
+    
+    if not efm:
+        sig = path_to_signature(seg, trunc=level).array.T[-1]
+    else:
+        t_seg = time2[start:end]
+        sig = path_to_fm_signature(seg, trunc=level, t_grid=t_seg, lam=lam).array.T[-1]
+    
+    step_sigs.append(sig)
+
+zero_sig = np.zeros_like(step_sigs[0])
+prefix_sums = np.cumsum([zero_sig] + step_sigs, axis=0)
+
+# 3. Extract Rolling Averages
+exp_sig_arr = []
+timestamp = []
+
+for k in range(exp_window, len(prefix_sums)):
+
+    window_sum = prefix_sums[k] - prefix_sums[k - exp_window]
+    exp_sig_arr.append(window_sum / exp_window)
+
+    timestamp.append(k * (T2 // N_wind))
+'''
+######################################################################################################
+######################################################################################################
+######################################################################################################
+######################################################################################################
 #%%
 X = StandardScaler().fit_transform(exp_sig_arr)
 reducer = umap.UMAP(
-    n_neighbors=15,
+    n_neighbors=20,
     min_dist=0.01,
     n_components=2,
     random_state = 42,
@@ -91,7 +156,7 @@ reducer.fit(X[:split_for_umap])
 embedding = reducer.transform(X)
 # Plot
 plt.figure()
-plt.scatter(embedding[:, 0], embedding[:, 1],c=timestamp, cmap='seismic',  s=10)
+plt.scatter(embedding[:, 0], embedding[:, 1],c=timestamp, cmap='gnuplot',  s=10)
 plt.colorbar()
 plt.xlabel("UMAP 1")
 plt.ylabel("UMAP 2")
@@ -105,7 +170,7 @@ z = timestamp
 fig = plt.figure(figsize=(10,7))
 ax = fig.add_subplot(111, projection='3d')
 
-sc = ax.scatter(x, y, z, c=z, cmap='seismic', s=5, alpha=0.7)
+sc = ax.scatter(x, y, z, c=z, cmap='gnuplot', s=5, alpha=0.7)
 
 ax.set_xlabel('UMAP 1')
 ax.set_ylabel('UMAP 2')
@@ -141,7 +206,7 @@ reducer1.fit(X1[:split_for_umap])
 embedding1 = reducer1.transform(X1)
 # Plot
 plt.figure()
-plt.scatter(embedding1[:, 0], embedding1[:, 1],c=time2, cmap='seismic',  s=10)
+plt.scatter(embedding1[:, 0], embedding1[:, 1],c=time2, cmap='gnuplot',  s=10)
 plt.colorbar()
 plt.xlabel("UMAP 1")
 plt.ylabel("UMAP 2")
@@ -155,7 +220,7 @@ z = time2
 fig = plt.figure(figsize=(10,7))
 ax = fig.add_subplot(111, projection='3d')
 
-sc = ax.scatter(-x, y, z, c=z, cmap='seismic', s=5, alpha=0.7)
+sc = ax.scatter(-x, y, z, c=z, cmap='gnuplot', s=5, alpha=0.7)
 
 ax.set_xlabel('UMAP 1')
 ax.set_ylabel('UMAP 2')

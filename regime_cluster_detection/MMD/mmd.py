@@ -9,6 +9,7 @@ import sigkernel
 import torch
 
 def efm_transform(X, lam, t_grid):
+    """EFM transformation (piece-wise linear approximation) for Sigkernel"""
     T=np.max(t_grid)
     dX=np.diff(X)
     t_grid_p1=t_grid[1:]
@@ -19,7 +20,9 @@ def efm_transform(X, lam, t_grid):
     return X1
 
 def MMD(X, Y, bias=False, efm =False, lam = None, t_grid_X = None, t_grid_Y = None):
-    """ X,Y of dimension (batch, len) or X,Y of dimension (batch, len, dim)"""
+    """ X,Y of dimension (batch, len) or X,Y of dimension (batch, len, dim)
+        Compute MMD distance of X, Y with normal signatures  vs EFM signatures
+    """
     print('X',X.shape, t_grid_X.shape )
     print('Y',Y.shape, t_grid_Y.shape )
     static_kernel = sigkernel.LinearKernel()
