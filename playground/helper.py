@@ -61,14 +61,13 @@ def compute_efm_signatures(
         raise ValueError("t_grid and simulations must be 2D arrays (N_paths, N_times).")
 
     n_times = t_grid.shape[1]
-    if simulations.shape[1] != n_times:
-        raise ValueError("t_grid and simulations must have the same number of time columns.")
-
 
     y = []
 
     t_grid_shifted = t_grid - t_grid[0][start_idx]        
     sim_path = simulations 
+    print('sim path:', sim_path.shape)
+    
     path = np.vstack([t_grid_shifted, sim_path]).T 
     
 

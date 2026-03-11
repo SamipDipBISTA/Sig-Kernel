@@ -3,7 +3,6 @@ numpy
 pandas
 time
 sklearn
-scipy
 tqdm
 umap
 signature  #EFM signature Library

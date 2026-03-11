@@ -1,6 +1,7 @@
 """
 ridge_signatures.py — Function for fitting the ridge regression model on sliding-window signature features.
 """
+import importlib
 
 import numpy as np
 from sklearn.linear_model import Ridge
@@ -75,9 +76,10 @@ def ridge_signatures(
     """
     #Initialize parameters for EFM sig
 #-------------------------------------------
-    n_obs = len(covariates)
+    n_obs = np.max(covariates.shape)
     t_grid = np.linspace(0, T, n_obs)
     t_grid = t_grid.reshape(1,-1)
+
 #-------------------------------------------
     if metric not in METRICS:
         raise ValueError(f"Unknown metric '{metric}', choose from {list(METRICS.keys())}")
@@ -180,7 +182,7 @@ def ridge_signatures(
     elif signature_type == 'efm': #EFM signatures
         if len(lam)==0:
             raise ValueError('efm signatures need lambda')
-        _, signatures = compute_efm_signatures(n_obs=n_obs, t_grid=t_grid, simulations=covariates.reshape(1,-1), trunc = trunc_order, start_idx=max_window, lam=lam) # function imported from helper.py
+        _, signatures = compute_efm_signatures(n_obs=n_obs, t_grid=t_grid, simulations=covariates, trunc = trunc_order, start_idx=max_window, lam=lam) # function imported from helper.py
         print('EFM signatures shape:', signatures.shape)
 
         # Train-validation-test split
@@ -289,6 +291,7 @@ def ridge_signatures(
     return {
         "y_pred_train": y_pred_train,
         "y_pred_test": y_pred_test,
+        "y_true_train": y_true_train,
         "y_true_test": y_true_test,
         "error_train": error_train,
         "error_test": error_test,
