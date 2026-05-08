@@ -10,7 +10,7 @@ from tqdm import tqdm
 from tabulate import tabulate
 
 from .config import (
-    LAGS, ORDERS, LAMBDA_DIRECT, LAMBDA_SOURCE, LAMBDA_TRANSFER,
+    LAGS, ORDERS, ALPHA_SOURCE, ALPHA_TRANSFER,
     N_EXPERIMENTS, N_SOURCE, RANDOM_SEED, TRAIN_END, BASE_DIR,
 )
 from .data_utils import sample_stocks
@@ -120,11 +120,11 @@ def run_single_experiment(cache, valid_tickers, lag, order, exp_id,
     X_t_te_n = (X_t_te - mu_t) / sd_t
     y_t_te_n = (y_t_te - my_t) / sy_t
 
-    theta_direct = ridge_solve(X_t_tr_n, y_t_tr_n, LAMBDA_DIRECT)
+    theta_direct = ridge_solve(X_t_tr_n, y_t_tr_n, ALPHA_SOURCE)
     y_pred_direct = predict(X_t_te_n, theta_direct)
 
-    theta_S = ridge_solve(X_source, y_source, LAMBDA_SOURCE)
-    theta_T = transfer_ridge_solve(X_t_tr_n, y_t_tr_n, theta_S, LAMBDA_TRANSFER)
+    theta_S = ridge_solve(X_source, y_source, ALPHA_SOURCE)
+    theta_T = transfer_ridge_solve(X_t_tr_n, y_t_tr_n, theta_S, ALPHA_TRANSFER)
     y_pred_transfer = predict(X_t_te_n, theta_T)
 
     metrics_direct = compute_all_metrics(y_t_te_n, y_pred_direct)

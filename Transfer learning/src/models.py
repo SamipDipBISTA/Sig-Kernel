@@ -1,18 +1,18 @@
 import numpy as np
 
 
-def ridge_solve(X, y, lam):
+def ridge_solve(X, y, alpha):
     n, d = X.shape
-    A = (X.T @ X) / n + lam * np.eye(d)
+    A = (X.T @ X) / n + alpha * np.eye(d)
     b = (X.T @ y) / n
     theta = np.linalg.solve(A, b)
     return theta
 
 
-def transfer_ridge_solve(X, y, theta_S, lam):
+def transfer_ridge_solve(X, y, theta_S, alpha):
     n, d = X.shape
-    A = (X.T @ X) / n + lam * np.eye(d)
-    b = (X.T @ y) / n + lam * theta_S
+    A = (X.T @ X) / n + alpha * np.eye(d)
+    b = (X.T @ y) / n + alpha * theta_S
     theta = np.linalg.solve(A, b)
     return theta
 

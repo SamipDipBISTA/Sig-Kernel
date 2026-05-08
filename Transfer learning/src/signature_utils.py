@@ -15,6 +15,10 @@ def get_signature_dim(path_dim=3, order=2):
 
 def compute_signature_features(log_prices, log_volumes, lag, order):
     n = len(log_prices)
+    if n < lag + 1:
+        raise ValueError(
+            f"Series too short for lag={lag}: need at least {lag + 1} points, got {n}"
+        )
     n_valid = n - lag
     sig_dim = get_signature_dim(3, order)
     features = np.empty((n_valid, sig_dim))
