@@ -1,3 +1,24 @@
+"""
+Entry point for the Path Signature Transfer Learning experiment.
+
+Reproduces the results described in "Risk of Transfer Learning and its
+Applications in Finance" (Cao, Gu, Guo, Rosenbaum, arXiv:2311.03283v1),
+Section 4.  The pipeline proceeds as:
+
+  1. Download (or load cached) IT sector stock data from Yahoo Finance.
+  2. Filter tickers with >= 90% business-day coverage.
+  3. Precompute path-signature features for all (lag, order) combinations.
+  4. Run Table 1 (grid search over lag/order) and Table 2 (correlation at L=5,M=2).
+  5. Generate plots: heatmaps, bar charts, scatter plots, distribution histograms.
+
+CLI arguments:
+  --n-experiments    Number of random stock selections (default 200)
+  --n-source         Number of source stocks per experiment (default 10)
+  --standardization  Standardization mode: "dataset" or "per_stock"
+  --skip-download    Skip data download if already cached
+  --plot-only PATH   Load saved results and only regenerate plots
+"""
+
 import argparse
 import sys
 import os
@@ -23,6 +44,7 @@ import src.experiment as exp_mod
 
 # %%
 def main():
+    """Parse CLI arguments and run the transfer learning experiment pipeline."""
     parser = argparse.ArgumentParser(
         description="Section 4: Transfer Learning for Stock Return Prediction"
     )
@@ -49,6 +71,7 @@ def main():
     )
     args = parser.parse_args()
 
+    # Override global N_SOURCE for consistency across modules
     cfg.N_SOURCE = args.n_source
     exp_mod.N_SOURCE = args.n_source
 
